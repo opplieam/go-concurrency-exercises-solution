@@ -9,23 +9,28 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
 
-func producer(stream Stream) (tweets []*Tweet) {
-	for {
-		tweet, err := stream.Next()
-		if err == ErrEOF {
-			return tweets
+func producer(stream Stream) <-chan *Tweet {
+	out := make(chan *Tweet)
+	go func() {
+		defer close(out)
+		for {
+			tweet, err := stream.Next()
+			if errors.Is(err, ErrEOF) {
+				return
+			}
+			out <- tweet
 		}
-
-		tweets = append(tweets, tweet)
-	}
+	}()
+	return out
 }
 
-func consumer(tweets []*Tweet) {
-	for _, t := range tweets {
+func consumer(tweets <-chan *Tweet) {
+	for t := range tweets {
 		if t.IsTalkingAboutGo() {
 			fmt.Println(t.Username, "\ttweets about golang")
 		} else {
